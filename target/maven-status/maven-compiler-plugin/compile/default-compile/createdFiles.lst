@@ -1,1 +1,4 @@
 org/daviipkp/gesyca/Main.class
+org/daviipkp/gesyca/Serializer.class
+org/daviipkp/gesyca/Serializer$1.class
+org/daviipkp/gesyca/DTOs/MachineInfo.class
