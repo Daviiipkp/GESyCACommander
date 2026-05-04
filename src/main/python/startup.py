@@ -1,4 +1,4 @@
-import socket, uuid, requests
+import socket, uuid, requests, re
 from dataclasses import dataclass, asdict
 
 @dataclass
@@ -20,7 +20,8 @@ def get_machine_info():
     mac = uuid.getnode()
     mac_address = ':'.join(f'{(mac >> ele) & 0xff:02x}' for ele in range(40, -1, -8))
 
-    ID = int(mac_address.replace(":", ""), 16)
+    match = re.search(r'\d+', hostname)
+    ID = int(match.group()) if match else 0
 
     machine = MachineInfo(
         hostname=hostname,
