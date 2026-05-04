@@ -65,12 +65,7 @@ public class Main {
     public static void setupServer() {
         server = Javalin.create(config -> {
             config.routes.get("/hosts", ctx -> {
-                StringJoiner b = new StringJoiner(" ");
-                Files.lines(HOSTS_FILE.toPath()).forEach((String s) -> {
-                    b.add(s);
-                });
-
-                ctx.result(b.toString() + System.lineSeparator());
+                ctx.result(hostsAsString());
             });
 
             config.routes.post("/add", ctx -> {
@@ -80,6 +75,7 @@ public class Main {
             config.routes.post("/boot", ctx -> {
                 MachineInfo mi = ctx.bodyAsClass(MachineInfo.class);
                 ctx.result();
+
             });
 
             
@@ -96,6 +92,19 @@ public class Main {
                 HOSTS_FILE.toPath(), 
                 ip.getBytes(), 
                 StandardOpenOption.APPEND);
+    }
+
+    private static String hostsAsString() {
+        try {
+            StringJoiner b = new StringJoiner(" ");
+            Files.lines(HOSTS_FILE.toPath()).forEach((String s) -> {
+                b.add(s);
+            });
+    
+            return (b.toString() + System.lineSeparator());
+        } catch (Exception e) {
+            return "Impossible to read hosts.txt file";
+        }
     }
 
 }

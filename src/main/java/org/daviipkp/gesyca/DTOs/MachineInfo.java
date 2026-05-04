@@ -1,6 +1,6 @@
 package org.daviipkp.gesyca.DTOs;
 
-public record MachineInfo(
+public record MachineInfo (
         String hostname,
         String ipAddress,
         int ID,
