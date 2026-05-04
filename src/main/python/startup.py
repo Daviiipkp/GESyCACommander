@@ -36,8 +36,19 @@ data = get_machine_info()
 
 
 # Alterar endpoint para enviar a machine info para o backend
-#response = requests.post(
-#    "http://daviipkp:4500/boot",
-#    json=data
-#)
+try:
+    print("Registing in master...")
+
+    response = requests.post(
+        "http://daviipkp:4500/boot",
+        json=data,
+        timeout=3
+    )
+
+    response.raise_for_status()
+
+    print("Successful register in master!")
+
+except requests.exceptions.RequestException as e:
+    print("Erro ao enviar a requisição: ", e)
 
