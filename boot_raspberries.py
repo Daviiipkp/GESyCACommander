@@ -1,5 +1,4 @@
-import socket, uuid
-from random import randint
+import socket, uuid, requests
 from dataclasses import dataclass, asdict
 
 @dataclass
@@ -32,4 +31,10 @@ def get_machine_info():
 
     return asdict(machine)
 
-print(get_machine_info())
+data = get_machine_info()
+
+response = requests.post(
+    "http://daviipkp:4500/boot",
+    json=data
+)
+
