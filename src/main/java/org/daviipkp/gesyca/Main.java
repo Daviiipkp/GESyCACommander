@@ -175,16 +175,32 @@ public class Main {
                 }
                 });
 
-            config.routes.get("/command", ctx -> {
+            config.routes.post("/command/{id}", ctx -> {
+                String pathId = ctx.pathParam("id");
+                int i = -1;
+                try {
+                    i = Integer.parseInt(pathId);
+                } catch (NumberFormatException e) {
+                    if(!pathId.equalsIgnoreCase("all")) {
+                        ctx.result("Usage error! Expected /command/{id} or /command/all.");
+                        return;
+                    } 
+                }
+
                 CommandInfo b = ctx.bodyAsClass(CommandInfo.class);
                 StringBuilder sb = new StringBuilder();
                 Map<Integer, MachineInfo> machines = Serializer.listHosts(HOSTS_FILE);
-                for(int id : b.machines()) {
-                    try {
-                        ctx.result(sendCommand(machines.get(id).hostname(), machines.get(id).ipAddress(), b.pass(), b.cmd(), id));
-                    } catch (Exception e) {
-                        ctx.result("Error trying to send to machine with id " + id + ". Error message: " + e.getMessage());
+                if(i == -1) {
+                    for(int id : b.machines()) {
+                        try {
+                            sb.append(sendCommand(machines.get(id).hostname(), machines.get(id).ipAddress(), b.pass(), b.cmd(), id));
+                        } catch (Exception ee) {
+                            ctx.result("Error trying to send to machine with id " + id + ". Error message: " + ee.getMessage());
+                        }
                     }
+                    ctx.result(sb.toString());
+                } else{
+                    ctx.result(sendCommand(machines.get(i).hostname(), machines.get(i).ipAddress(), b.pass(), b.cmd(), i));
                 }
                 
             });
