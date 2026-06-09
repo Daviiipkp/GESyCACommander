@@ -1,15 +1,29 @@
 package org.daviipkp.gesyca;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.net.InetAddress;
+import java.net.NetworkInterface;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
+import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
 import java.util.StringJoiner;
 
+import org.daviipkp.gesyca.DTOs.CommandInfo;
 import org.daviipkp.gesyca.DTOs.MachineInfo;
+import org.daviipkp.gesyca.DTOs.MachineInfoWithID;
+
+import com.jcraft.jsch.Channel;
+import com.jcraft.jsch.ChannelExec;
+import com.jcraft.jsch.JSch;
+import com.jcraft.jsch.Session;
 
 import io.javalin.Javalin;
 
@@ -20,7 +34,6 @@ public class Main {
 
     private static final String MAIN_FOLDER = System.getProperty("user.dir"); 
     private static final File HOSTS_FILE = new File(MAIN_FOLDER + File.separator +  "hosts.json");
-    private static boolean temp = false;
 
     public static void main( String[] args ) {
         System.out.println("Setting up...");
@@ -37,52 +50,142 @@ public class Main {
             }
         }else{
             try {
-                String ip = InetAddress.getLocalHost().getHostAddress();
+                String ip = getRealIP();
                 System.out.println("Detectado o IP da máquina como " + ip);
-                Files.lines(HOSTS_FILE.toPath()).forEach((String ss) -> {
-                    InetAddress inetAddress;
-
-                    System.out.println("Detectado o IP da máquina como " + ip);
-                    if(ip.equals(ss)) {
-                        temp = true;
+                Map<Integer, MachineInfo> hosts = Serializer.listHosts(HOSTS_FILE);
+                for(Integer i : hosts.keySet()) {
+                    if(ip.equals(hosts.get(i).ipAddress())) {
+                        Serializer.removeHost(HOSTS_FILE, ip);
                     }
-           
-                });
-                if(temp) {
-                    try {
-                        addHost(InetAddress.getLocalHost().getHostAddress());
-                        System.out.println("IP da máquina adicionado ao 'hosts.json' com sucesso.");
-                    } catch (Exception e) {
-                        System.out.println("Impossível adicionar o IP da máquina atual ao arquivo.");
+                    if(getMac().equals(hosts.get(i).macAddress())) {
+                        Serializer.removeHost(HOSTS_FILE, ip);
                     }
                 }
+                try {
+                    
+                    Serializer.addHost(HOSTS_FILE, new MachineInfoWithID(InetAddress.getLocalHost().getHostName(), ip, 1, getMac()));
+                    System.out.println("IP da máquina adicionado ao 'hosts.json' com sucesso.");
+                } catch (Exception e) {
+                    System.out.println("Impossível adicionar o IP da máquina atual ao arquivo. Stacktrace: ");
+                    e.printStackTrace();
+                }
+                
             } catch (IOException e) {
-                System.out.println("Não foi possível ler o arquivo 'hosts.json'. Verifique permissões.");
+                System.out.println("Não foi possível ler o arquivo 'hosts.json'. Verifique permissões. stacktrace: ");
+                e.printStackTrace();
             }
             
         }
         setupServer();
     }
 
+    public static String getRealIP() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface iface = interfaces.nextElement();
+
+                if (iface.isLoopback() || !iface.isUp()) {
+                    continue;
+                }
+
+                Enumeration<InetAddress> addresses = iface.getInetAddresses();
+                while (addresses.hasMoreElements()) {
+                    InetAddress addr = addresses.nextElement();
+
+                    if (addr instanceof java.net.Inet4Address) {
+                        return addr.getHostAddress();
+                    }
+                }
+            }
+        } catch (SocketException e) {
+            e.printStackTrace();
+        }
+        return "IP não encontrado";
+    }
+
+    public static String getMac() {
+        try {
+            Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
+            
+            while (interfaces.hasMoreElements()) {
+                NetworkInterface network = interfaces.nextElement();
+                
+                if (!network.isUp() || network.isLoopback() || network.isVirtual()) {
+                    continue;
+                }
+                
+                byte[] mac = network.getHardwareAddress();
+                
+                if (mac != null) {
+                    StringBuilder sb = new StringBuilder();
+                    for (int i = 0; i < mac.length; i++) {
+                        sb.append(String.format("%02X%s", mac[i], (i < mac.length - 1) ? "-" : ""));
+                    }
+                    return sb.toString();
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Erro ao tentar obter o MAC: " + e.getMessage());
+        }
+        
+        return "NOT FOUND!";
+    }
+
     public static void setupServer() {
         server = Javalin.create(config -> {
-            config.routes.get("/hosts", ctx -> {
-                System.out.println("Received on /hosts");
+            config.routes.get("/hostsr", ctx -> {
+                System.out.println("Received on /hostsr");
                 try {
-                    List<MachineInfo> hosts = Serializer.listHosts(HOSTS_FILE);
+                    Map<Integer, MachineInfo> hosts = Serializer.listHosts(HOSTS_FILE);
 
-                    Map<String, List<MachineInfo>> jsonResponse = Map.of("content", hosts);
+                    Map<String, Map<Integer, MachineInfo>> jsonResponse = Map.of("content", hosts);
                     
                     ctx.json(jsonResponse);
                     
-                    
+                    ctx.status(201); 
                 } catch (IOException e) {
                     e.printStackTrace();
                     ctx.status(500).result("Erro interno ao ler o arquivo de hosts.");
                 }
                 });
 
-            config.routes.post("/add", ctx -> {
+            config.routes.get("/hostsf", ctx -> {
+                System.out.println("Received on /hostsf");
+                try {
+                    Map<Integer, MachineInfo> hosts = Serializer.listHosts(HOSTS_FILE);
+
+                    StringBuilder b = new StringBuilder();
+                    for(int i = 1; i < 11; i++) {
+                       if(hosts.containsKey(i)) {
+                            b.append("Machine with ID " + i + "\n");
+                            b.append("Machine with IP Address " + hosts.get(i).ipAddress() + "\n");
+                            b.append("Machine with hostname " + hosts.get(i).hostname() + "\n");
+                            b.append("Machine with MAC Address " + hosts.get(i).macAddress() + "\n");
+                            b.append("=======================" + "\n");
+                       }
+                    }
+                    
+                    ctx.result(b.toString());
+                    
+                    ctx.status(201); 
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    ctx.status(500).result("Erro interno ao ler o arquivo de hosts.");
+                }
+                });
+
+            config.routes.get("/command", ctx -> {
+                CommandInfo b = ctx.bodyAsClass(CommandInfo.class);
+                StringBuilder sb = new StringBuilder();
+                Map<Integer, MachineInfo> machines = Serializer.listHosts(HOSTS_FILE);
+                for(int id : b.machines()) {
+                    try {
+                        ctx.result(sendCommand(machines.get(id).hostname(), machines.get(id).ipAddress(), b.pass(), b.cmd(), id));
+                    } catch (Exception e) {
+                        ctx.result("Error trying to send to machine with id " + id + ". Error message: " + e.getMessage());
+                    }
+                }
                 
             });
 
@@ -93,21 +196,21 @@ public class Main {
             });
 
             config.routes.post("/boot", ctx -> {
-                System.out.println("Received on /boot");
-                MachineInfo mi = ctx.bodyAsClass(MachineInfo.class);
-                List<MachineInfo> hosts = Serializer.listHosts(HOSTS_FILE);
-                MachineInfo toRem = null;
-                for(MachineInfo m : hosts) {
-                    if(m.macAddress().equalsIgnoreCase(mi.macAddress())) {
+                MachineInfoWithID mi = ctx.bodyAsClass(MachineInfoWithID.class);
+                System.out.println("Received on /boot from machine with ID " + mi.ID() + " and IP Address " + mi.ipAddress());
+                Map<Integer,MachineInfo> hosts = Serializer.listHosts(HOSTS_FILE);
+                Integer toRem = null;
+                for(Integer m : hosts.keySet()) {
+                    if(hosts.get(m).macAddress().equalsIgnoreCase(mi.macAddress())) {
                         toRem = m;
                         break;
                     }
                     
                 }
                 hosts.remove(toRem);
-                hosts.add(mi);
+                hosts.put(mi.ID(),new MachineInfo(mi.hostname(), mi.ipAddress(), mi.macAddress()));
                 Serializer.saveHosts(HOSTS_FILE, hosts);
-                ctx.result("Success!!");
+                ctx.status(201); 
             });
 
             
@@ -118,26 +221,59 @@ public class Main {
         
     }
 
-    private static void addHost(String arg0) throws IOException{
-        String ip = arg0 + System.lineSeparator();
-                Files.write(
-                HOSTS_FILE.toPath(), 
-                ip.getBytes(), 
-                StandardOpenOption.APPEND);
-    }
+    public static String sendCommand(String user, String host, String password, String command, int ID) {
+        JSch j = new JSch();
+        Session session = null;
+        ChannelExec c = null;
+        StringBuilder b = new StringBuilder();
+        try {
+            session = j.getSession(user, host, 22);
+            session.setPassword(password);
+            session.setConfig("StrictHostKeyChecking", "no");
 
-    // private static String hostsAsString() {
-    //     try {
-    //         StringJoiner b = new StringJoiner(" ");
-    //         for(MachineInfo i : Serializer.listHosts(HOSTS_FILE)) {
-
-    //         }
+            session.connect();
+            c = (ChannelExec) session.openChannel("exec");
             
-    
-    //         return (b.toString() + System.lineSeparator());
-    //     } catch (Exception e) {
-    //         return "Impossible to read hosts.txt file";
-    //     }
-    // }
+            c.setCommand(command);
+
+            InputStream in = c.getInputStream();
+            InputStream err = c.getErrStream();
+
+            c.connect();
+
+            BufferedReader reader = new BufferedReader(new InputStreamReader(in));
+            String line;
+            b.append("");
+            b.append("--- Output from machine with ID " + ID + " ---");
+            while ((line = reader.readLine()) != null) {
+                b.append(line);
+            }
+            b.append("");
+
+
+            BufferedReader errReader = new BufferedReader(new InputStreamReader(err));
+            while ((line = errReader.readLine()) != null) {
+                b.append("Err: " + line);
+            }
+
+            if (c.isClosed()) {
+               b.append("Exit status: " + c.getExitStatus());
+            }
+
+            
+
+        } catch (Exception e) {
+            b.append("Error on machine with ID " + ID + ", error message: " + e.getMessage());
+        } finally {
+            if (c != null && c.isConnected()) {
+                c.disconnect();
+            }
+            if (session != null && session.isConnected()) {
+                session.disconnect();
+            }
+            b.append("Ended connection to machine with ID " + ID);
+        }
+        return b.toString();
+    }
 
 }
