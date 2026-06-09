@@ -191,7 +191,7 @@ public class Main {
                 StringBuilder sb = new StringBuilder();
                 Map<Integer, MachineInfo> machines = Serializer.listHosts(HOSTS_FILE);
                 if(i == -1) {
-                    for(int id : b.machines()) {
+                    for(int id : machines.keySet()) {
                         try {
                             sb.append(sendCommand(machines.get(id).hostname(), machines.get(id).ipAddress(), b.pass(), b.cmd(), id));
                         } catch (Exception ee) {
@@ -200,7 +200,11 @@ public class Main {
                     }
                     ctx.result(sb.toString());
                 } else{
-                    ctx.result(sendCommand(machines.get(i).hostname(), machines.get(i).ipAddress(), b.pass(), b.cmd(), i));
+                    try {
+                        ctx.result(sendCommand(machines.get(i).hostname(), machines.get(i).ipAddress(), b.pass(), b.cmd(), i));
+                    } catch (NullPointerException e) {
+                        ctx.result("Machine with id " + i + " is not registered");
+                    }
                 }
                 
             });

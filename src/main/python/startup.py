@@ -35,7 +35,7 @@ def get_machine_info():
 data = get_machine_info()
 
 
-#Alterar endpoint para enviar a machine info para o backend
+#change this address!
 response = requests.post(
     "http://10.10.70.52:4500/boot",
     json=data
