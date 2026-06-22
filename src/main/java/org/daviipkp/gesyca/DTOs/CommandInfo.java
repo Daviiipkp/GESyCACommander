@@ -5,5 +5,6 @@ import java.util.List;
 public record CommandInfo (
         String cmd,
         String delay,
+        String username,
         String pass
     ) {}

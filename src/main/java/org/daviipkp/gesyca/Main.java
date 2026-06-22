@@ -193,7 +193,7 @@ public class Main {
                 if(i == -1) {
                     for(int id : machines.keySet()) {
                         try {
-                            sb.append(sendCommand(machines.get(id).hostname(), machines.get(id).ipAddress(), b.pass(), b.cmd(), id));
+                            sb.append(sendCommand(b.username(), machines.get(id).ipAddress(), b.pass(), b.cmd(), id));
                         } catch (Exception ee) {
                             ctx.result("Error trying to send to machine with id " + id + ". Error message: " + ee.getMessage());
                         }
@@ -201,7 +201,7 @@ public class Main {
                     ctx.result(sb.toString());
                 } else{
                     try {
-                        ctx.result(sendCommand(machines.get(i).hostname(), machines.get(i).ipAddress(), b.pass(), b.cmd(), i));
+                        ctx.result(sendCommand(b.username(), machines.get(i).ipAddress(), b.pass(), b.cmd(), i));
                     } catch (NullPointerException e) {
                         ctx.result("Machine with id " + i + " is not registered");
                     }
