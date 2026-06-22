@@ -1,6 +1,6 @@
 # Gesyca Commander
 
-### The main software in Java is commander that can receive requisitions in the following endpoints:
+### The main software in Java is the commander that can receive requisitions in the following endpoints:
 **POST /boot** - expecting a json containing *String hostname*, *String ipAddress*, *int ID*, *String macAddress*. It registers the machine.
 
 **POST /command/{id}** or **/command/all** - which expects  a json containing *String command*, *String password*. It executes the commands (separed by \n) in the machines and returns the outputs formatted.
@@ -11,6 +11,7 @@
 
 **GET /hostsf** - will return a formatted String with all registered machines.
 
+**Said endpoints will only be available once you execute the .jar file in the main machine.**
 
 ### To set-up a machine, you don't need to send the /boot requisition on your own. Just use the "startup.sh" script once.
 
